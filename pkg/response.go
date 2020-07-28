@@ -22,8 +22,8 @@ func response(w http.ResponseWriter, ra Response) {
 
 // responseError generates log, alarm and response when an error occurs
 func responseError(w http.ResponseWriter, message string, err error) {
-	e := &errorLogger{message, http.StatusInternalServerError, err, logError(err)}
-	e.sendAlarm()
+	// e := &errorLogger{message, http.StatusInternalServerError, err, logError(err)}
+	// e.sendAlarm()
 
 	ra := Response{
 		Code:    http.StatusInternalServerError,
@@ -34,9 +34,6 @@ func responseError(w http.ResponseWriter, message string, err error) {
 
 // responseUnprocessable calls response function to inform user of something does not work 100% OK
 func responseUnprocessable(w http.ResponseWriter, message string, err error) {
-	e := &errorLogger{message, http.StatusUnprocessableEntity, err, logError(err)}
-	e.sendAlarm()
-
 	ra := Response{
 		Code:    http.StatusUnprocessableEntity,
 		Message: message,
@@ -62,7 +59,7 @@ type errorLogger struct {
 
 // sendAlarm to VictorOps plattform and format the error for more info
 func (e *errorLogger) sendAlarm() {
-	e.msg = fmt.Sprintf("Googlehook -> %s", e.msg)
+	e.msg = fmt.Sprintf("Dynamodb -> %s", e.msg)
 	log.Println(e.log)
 
 	mstype := voalarm.Acknowledgement
