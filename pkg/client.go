@@ -1,4 +1,4 @@
-package dynamo_test
+package dynamoapi
 
 import (
 	"encoding/json"
