@@ -1,6 +1,7 @@
 package dynamo_test
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
@@ -11,40 +12,49 @@ import (
 
 // Response represents the data structure needed to create a response
 type Response struct {
-	Code    int
-	Message string `json:"message"`
+	Code    int                    `json:"-"`
+	Success bool                   `json:"success"`
+	Message string                 `json:"message,omitempty"`
+	Data    map[string]interface{} `json:"data,omitempty"`
 }
 
 // response sets the params to generate a JSON response
 func response(w http.ResponseWriter, ra Response) {
+	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(ra.Code)
+
+	json.NewEncoder(w).Encode(ra)
 }
 
-// responseError generates log, alarm and response when an error occurs
-func responseError(w http.ResponseWriter, message string, err error) {
-	// e := &errorLogger{message, http.StatusInternalServerError, err, logError(err)}
-	// e.sendAlarm()
-
+// responseError generates a 500 status response
+func responseError(w http.ResponseWriter, message string) {
 	ra := Response{
 		Code:    http.StatusInternalServerError,
+		Success: false,
 		Message: message,
 	}
 	response(w, ra)
 }
 
-// responseUnprocessable calls response function to inform user of something does not work 100% OK
-func responseUnprocessable(w http.ResponseWriter, message string, err error) {
+// responseUnprocessable a 422 status response
+func responseUnprocessable(w http.ResponseWriter, message string) {
 	ra := Response{
 		Code:    http.StatusUnprocessableEntity,
+		Success: false,
 		Message: message,
 	}
 	response(w, ra)
 }
 
 // responseOk calls response function with proper data to generate an OK response
-func responseOk(w http.ResponseWriter) {
+func responseOk(w http.ResponseWriter, data map[string]interface{}) {
 	ra := Response{
-		Code: http.StatusOK,
+		Code:    http.StatusOK,
+		Success: true,
+		Data:    nil,
+	}
+	if data != nil {
+		ra.Data = data
 	}
 	response(w, ra)
 }
