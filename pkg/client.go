@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
-	"math/rand"
 	"net/http"
 	"time"
 
@@ -18,6 +17,7 @@ import (
 //Handler manages global stuff
 type Handler struct {
 	AppContext AppContext
+	Dev        bool
 }
 
 // AppContext is a stuct to handle DynamoDB context
@@ -29,7 +29,7 @@ type AppContext struct {
 // HandleFunction is a function used to manage all received requests.
 func (h *Handler) HandleFunction() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		responseOk(w)
+		responseOk(w, nil)
 	})
 }
 
@@ -56,14 +56,19 @@ func (h *Handler) PrintTables() http.Handler {
 		if err != nil {
 			msg := "Error retrieving tables list"
 			test(err, msg)
-			responseError(w, msg, err)
+			responseError(w, msg)
 			return
 		}
-		log.Println("Tables: ")
-		for _, table := range tables {
-			log.Println(table)
+
+		logtxt := "Tables \n"
+		tablelist := make(map[string]interface{})
+		for idx, table := range tables {
+			i := fmt.Sprintf("%d", idx)
+			tablelist[i] = table
+			logtxt += fmt.Sprintf("%s \n", table)
 		}
-		responseOk(w)
+		h.PrintLog(logtxt)
+		responseOk(w, tablelist)
 	})
 }
 
@@ -74,7 +79,7 @@ func (h *Handler) DescribeTable() http.Handler {
 		if err != nil {
 			msg := "Error retrieving tables list"
 			test(err, msg)
-			responseError(w, msg, err)
+			responseError(w, msg)
 			return
 		}
 
@@ -86,33 +91,45 @@ func (h *Handler) DescribeTable() http.Handler {
 			if err != nil {
 				msg := fmt.Sprintf("Error describe table %s", tbl)
 				test(err, msg)
-				responseError(w, msg, err)
+				responseError(w, msg)
 				return
 			}
 			table := result.Table
-			fmt.Printf("done %s", table)
+			h.PrintLog(fmt.Sprintf("done %s", table))
 		}
 
 	})
 }
 
-// Input example
+// Input represents structure to retrieve an element
 type Input struct {
-	CustomerID string `json:"cust_id"`
-	Email      string `json:"email"`
+	Table string `json:"table"`
+	Key   string `json:"key"`
+	Value string `json:"value"`
 }
 
-// Item lalalal
+// Item represents structure to put an item.
+// You must set table name and its data
 type Item struct {
-	CustomerID             string `json:"customerId"`
-	LastName               string `json:"lastname"`
-	DateOfBirth            string `json:"date_of_birth"`
-	Email                  string `json:"email"`
-	IsEligibleForPromotion bool   `json:"is_eligible"`
-	Test                   string `json:"test"`
+	Table string                 `json:"table"`
+	Data  map[string]interface{} `json:"data"`
 }
 
-// GetItem asdfasdf
+// type Item struct {
+// 	CustomerID             string `json:"customerId"`
+// 	LastName               string `json:"lastname"`
+// 	DateOfBirth            string `json:"date_of_birth"`
+// 	Email                  string `json:"email"`
+// 	IsEligibleForPromotion bool   `json:"is_eligible"`
+// 	Test                   string `json:"test"`
+// }
+
+func test(err error, msg string) {
+	e := &errorLogger{msg, http.StatusInternalServerError, err, logError(err)}
+	e.sendAlarm()
+}
+
+// GetItem retrives an item from the tablename using key value as index
 func (h *Handler) GetItem() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 
@@ -120,82 +137,26 @@ func (h *Handler) GetItem() http.Handler {
 		rawdata, err := ioutil.ReadAll(r.Body)
 		if err != nil {
 			msg := "Error parsing body to bytes"
-			test(err, msg)
-			responseError(w, msg, err)
-			return
-		}
-
-		if err := json.Unmarshal(rawdata, &input); err != nil {
-			msg := "Error unmarshaling data"
-			test(err, msg)
-			responseError(w, msg, err)
-			return
-		}
-
-		log.Printf("input: %v", input)
-
-		result, err := h.AppContext.Db.GetItem(&dynamodb.GetItemInput{
-			TableName: aws.String("demo-customer-info"),
-			Key: map[string]*dynamodb.AttributeValue{
-				"customerId": {
-					S: aws.String(input.CustomerID),
-				},
-			},
-		})
-		if err != nil {
-			msg := "Error retrieving item"
-			test(err, msg)
-			responseError(w, msg, err)
-			return
-		}
-
-		item := Item{}
-		if err := dynamodbattribute.UnmarshalMap(result.Item, &item); err != nil {
-			msg := "Error mapping to item"
-			test(err, msg)
-			responseError(w, msg, err)
-			return
-		}
-
-		log.Printf("item: %v", item)
-
-		responseOk(w)
-	})
-}
-
-func test(err error, msg string) {
-	e := &errorLogger{msg, http.StatusInternalServerError, err, logError(err)}
-	e.sendAlarm()
-}
-
-// GetItemV2 blablabla
-func (h *Handler) GetItemV2() http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-
-		input := Input{}
-		rawdata, err := ioutil.ReadAll(r.Body)
-		if err != nil {
-			msg := "Error parsing body to bytes"
 			e := &errorLogger{msg, http.StatusInternalServerError, err, logError(err)}
 			e.sendAlarm()
-			responseError(w, msg, err)
+			responseError(w, msg)
 			return
 		}
 
 		if err := json.Unmarshal(rawdata, &input); err != nil {
 			msg := "Error unmarshaling data"
 			test(err, msg)
-			responseError(w, msg, err)
+			responseError(w, msg)
 			return
 		}
 
-		log.Printf("input: %v", input)
+		h.PrintLog(fmt.Sprintf("input: %v", input))
 
 		result, err := h.AppContext.Db.GetItem(&dynamodb.GetItemInput{
-			TableName: aws.String("demo-customer-info"),
+			TableName: aws.String(input.Table), // "demo-customer-info"
 			Key: map[string]*dynamodb.AttributeValue{
-				"customerId": {
-					S: aws.String(input.CustomerID),
+				input.Key: { // "customerId"
+					S: aws.String(input.Value), // input.CustomerID
 				},
 			},
 		})
@@ -203,40 +164,34 @@ func (h *Handler) GetItemV2() http.Handler {
 			msg := "Error retrieving item"
 			e := &errorLogger{msg, http.StatusInternalServerError, err, logError(err)}
 			e.sendAlarm()
-			responseError(w, msg, err)
+			responseError(w, msg)
 			return
 		}
 
-		// item := Item{}
 		item := make(map[string]interface{})
-
 		if err := dynamodbattribute.UnmarshalMap(result.Item, &item); err != nil {
 			msg := "Error mapping to item"
 			e := &errorLogger{msg, http.StatusInternalServerError, err, logError(err)}
 			e.sendAlarm()
-			responseError(w, msg, err)
+			responseError(w, msg)
 			return
 		}
+		h.PrintLog(fmt.Sprintf("retrieved item: %v", item))
 
-		log.Printf("retrieved item: %v", item)
-
-		responseOk(w)
+		responseOk(w, item)
 	})
 }
 
-// PutItem blabla
+// PutItem saves posted data into param table
 func (h *Handler) PutItem() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-
-		// item := Item{}
-		item := make(map[string]interface{})
-
+		item := Item{}
 		rawdata, err := ioutil.ReadAll(r.Body)
 		if err != nil {
 			msg := "Error parsing body to bytes"
 			e := &errorLogger{msg, http.StatusInternalServerError, err, logError(err)}
 			e.sendAlarm()
-			responseError(w, msg, err)
+			responseError(w, msg)
 			return
 		}
 
@@ -244,23 +199,23 @@ func (h *Handler) PutItem() http.Handler {
 			msg := "Error unmarshaling data"
 			e := &errorLogger{msg, http.StatusInternalServerError, err, logError(err)}
 			e.sendAlarm()
-			responseError(w, msg, err)
+			responseError(w, msg)
 			return
 		}
 
-		av, err := dynamodbattribute.MarshalMap(item)
+		av, err := dynamodbattribute.MarshalMap(item.Data)
 		if err != nil {
 			msg := "Error marshalling item"
 			e := &errorLogger{msg, http.StatusInternalServerError, err, logError(err)}
 			e.sendAlarm()
-			responseError(w, msg, err)
+			responseError(w, msg)
 			return
 		}
 
-		// Create item in table Movies
+		// Create item in table
 		input := &dynamodb.PutItemInput{
 			Item:      av,
-			TableName: aws.String("demo-customer-info"),
+			TableName: aws.String(item.Table), // "demo-customer-info"
 		}
 
 		_, err = h.AppContext.Db.PutItem(input)
@@ -269,27 +224,19 @@ func (h *Handler) PutItem() http.Handler {
 			msg := "Error putting item"
 			e := &errorLogger{msg, http.StatusInternalServerError, err, logError(err)}
 			e.sendAlarm()
-			responseError(w, msg, err)
+			responseError(w, msg)
 			return
 		}
+		h.PrintLog(fmt.Sprintf("putted item: %v", item))
 
-		log.Printf("putted item: %v", item)
-
-		responseOk(w)
+		responseOk(w, nil)
 	})
 }
 
-//HelperRandstring lalalal
-func HelperRandstring(length int) string {
-	const charset = "abcdefghijklmnopqrstuvwxyz" +
-		"ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
-
-	seededRand := rand.New(
-		rand.NewSource(time.Now().UnixNano()))
-
-	b := make([]byte, length)
-	for i := range b {
-		b[i] = charset[seededRand.Intn(len(charset))]
+// PrintLog prints log info when we are in dev mode
+func (h *Handler) PrintLog(txt string) {
+	if h.Dev {
+		now := time.Now().Format("2006-01-02 15-04-05")
+		log.Printf("%s - %s", now, txt)
 	}
-	return string(b)
 }
