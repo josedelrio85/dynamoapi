@@ -38,7 +38,8 @@ func (h *Handler) HandleTables() ([]string, error) {
 	tbllist, err := h.AppContext.Db.ListTables(&dynamodb.ListTablesInput{})
 	if err != nil {
 		msg := "Error retrieving tables list"
-		test(err, msg)
+		e := &errorLogger{msg, http.StatusInternalServerError, err, logError(err)}
+		e.sendAlarm()
 		return nil, err
 	}
 	tables := []string{}
@@ -55,7 +56,8 @@ func (h *Handler) PrintTables() http.Handler {
 		tables, err := h.HandleTables()
 		if err != nil {
 			msg := "Error retrieving tables list"
-			test(err, msg)
+			e := &errorLogger{msg, http.StatusInternalServerError, err, logError(err)}
+			e.sendAlarm()
 			responseError(w, msg)
 			return
 		}
@@ -78,7 +80,8 @@ func (h *Handler) DescribeTable() http.Handler {
 		tables, err := h.HandleTables()
 		if err != nil {
 			msg := "Error retrieving tables list"
-			test(err, msg)
+			e := &errorLogger{msg, http.StatusInternalServerError, err, logError(err)}
+			e.sendAlarm()
 			responseError(w, msg)
 			return
 		}
@@ -90,7 +93,8 @@ func (h *Handler) DescribeTable() http.Handler {
 			result, err := h.AppContext.Db.DescribeTable(req)
 			if err != nil {
 				msg := fmt.Sprintf("Error describe table %s", tbl)
-				test(err, msg)
+				e := &errorLogger{msg, http.StatusInternalServerError, err, logError(err)}
+				e.sendAlarm()
 				responseError(w, msg)
 				return
 			}
@@ -115,20 +119,6 @@ type Item struct {
 	Data  map[string]interface{} `json:"data"`
 }
 
-// type Item struct {
-// 	CustomerID             string `json:"customerId"`
-// 	LastName               string `json:"lastname"`
-// 	DateOfBirth            string `json:"date_of_birth"`
-// 	Email                  string `json:"email"`
-// 	IsEligibleForPromotion bool   `json:"is_eligible"`
-// 	Test                   string `json:"test"`
-// }
-
-func test(err error, msg string) {
-	e := &errorLogger{msg, http.StatusInternalServerError, err, logError(err)}
-	e.sendAlarm()
-}
-
 // GetItem retrives an item from the tablename using key value as index
 func (h *Handler) GetItem() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -145,7 +135,8 @@ func (h *Handler) GetItem() http.Handler {
 
 		if err := json.Unmarshal(rawdata, &input); err != nil {
 			msg := "Error unmarshaling data"
-			test(err, msg)
+			e := &errorLogger{msg, http.StatusInternalServerError, err, logError(err)}
+			e.sendAlarm()
 			responseError(w, msg)
 			return
 		}
