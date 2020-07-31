@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/dynamodb"
 	client "github.com/bysidecar/dynamodb_test/pkg"
@@ -40,6 +41,48 @@ func main() {
 			Db:   db,
 		},
 		Dev: dev,
+	}
+
+	// TODO v2 => hookify this structure (?)
+	tablename := "leads"
+	req := &dynamodb.DescribeTableInput{
+		TableName: aws.String(tablename),
+	}
+	_, err = handler.AppContext.Db.DescribeTable(req)
+	if err != nil {
+		if aerr, ok := err.(awserr.Error); ok {
+			t := dynamodb.ResourceNotFoundException{}
+			switch aerr.Code() {
+			case t.Code():
+				input := &dynamodb.CreateTableInput{
+					TableName: aws.String(tablename),
+					AttributeDefinitions: []*dynamodb.AttributeDefinition{
+						{
+							AttributeName: aws.String("passport_id"),
+							AttributeType: aws.String("S"),
+						},
+					},
+					KeySchema: []*dynamodb.KeySchemaElement{
+						{
+							AttributeName: aws.String("passport_id"),
+							KeyType:       aws.String("HASH"),
+						},
+					},
+					ProvisionedThroughput: &dynamodb.ProvisionedThroughput{
+						ReadCapacityUnits:  aws.Int64(10),
+						WriteCapacityUnits: aws.Int64(10),
+					},
+				}
+				_, err = handler.AppContext.Db.CreateTable(input)
+				if err != nil {
+					log.Fatalf("Error creating table %s. Err: %v", tablename, err)
+					return
+				}
+			default:
+				log.Fatalf("Error describing table %s. Err: %v", tablename, err)
+				return
+			}
+		}
 	}
 
 	router := mux.NewRouter()
