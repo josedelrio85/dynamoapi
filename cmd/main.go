@@ -3,6 +3,7 @@ package main
 import (
 	"log"
 	"net/http"
+	"os"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
@@ -15,6 +16,13 @@ import (
 
 func main() {
 	log.Println("DynamoDB with Golang test started!")
+
+	dev := false
+	devstring := getSetting("DEV")
+	if devstring == "true" {
+		dev = true
+	}
+	log.Printf("Are we working on dev? %t", dev)
 
 	sess, err := session.NewSession(&aws.Config{
 		Region:   aws.String("eu-west-1"),
@@ -31,6 +39,7 @@ func main() {
 			Sess: sess,
 			Db:   db,
 		},
+		Dev: dev,
 	}
 
 	router := mux.NewRouter()
@@ -40,9 +49,17 @@ func main() {
 	subrouter.Handle("/tables", handler.PrintTables())
 	subrouter.Handle("/describe", handler.DescribeTable())
 	subrouter.Handle("/item", handler.GetItem())
-	subrouter.Handle("/itemv2", handler.GetItemV2())
 	subrouter.Handle("/put", handler.PutItem())
 
 	log.Println("starting web server...")
 	log.Fatal(http.ListenAndServe(":9001", cors.Default().Handler(subrouter)))
+}
+
+func getSetting(setting string) string {
+	value, ok := os.LookupEnv(setting)
+	if !ok {
+		log.Fatalf("Init error, %s ENV var not found", setting)
+	}
+
+	return value
 }
