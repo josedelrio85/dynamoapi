@@ -9,7 +9,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/dynamodb"
-	client "github.com/bysidecar/dynamoapi/pkg"
+	client "github.com/josedelrio85/dynamoapi/pkg"
 
 	"github.com/gorilla/mux"
 	"github.com/rs/cors"

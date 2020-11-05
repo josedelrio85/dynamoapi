@@ -1,4 +1,4 @@
-module github.com/bysidecar/dynamoapi
+module github.com/josedelrio85/dynamoapi
 
 go 1.14
 
