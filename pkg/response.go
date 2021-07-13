@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"runtime"
 
-	"github.com/bysidecar/voalarm"
+	"github.com/josedelrio85/voalarm"
 )
 
 // Response represents the data structure needed to create a response
